@@ -2,3 +2,7 @@
 **/.env
 .env
 .DS_Store
+.venv
+poetry.lock
+pyproject.toml
+monitor.log
