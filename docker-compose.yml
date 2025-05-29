@@ -1,0 +1,90 @@
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.9.1
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    entrypoint:
+      - sh
+      - -c
+      - |
+        if [ ! -f "/var/lib/kafka/data/meta.properties" ]; then
+          CLUSTER_ID=$$(/usr/bin/kafka-storage random-uuid)
+          /usr/bin/kafka-storage format --ignore-formatted --cluster-id $$CLUSTER_ID --config /etc/kafka/kafka.properties
+        fi
+        exec /etc/confluent/docker/run
+    volumes:
+      - kraft-data:/var/lib/kafka/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/usr/bin/kafka-broker-api-versions",
+          "--bootstrap-server",
+          "kafka:9092",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  influxdb:
+    image: influxdb:2.7
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=admin123
+      - DOCKER_INFLUXDB_INIT_ORG=myorg
+      - DOCKER_INFLUXDB_INIT_BUCKET=tweets
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=mytoken
+    volumes:
+      - influxdb-storage:/var/lib/influxdb2
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    depends_on:
+      - influxdb
+
+  producer:
+    build:
+      context: .
+      dockerfile: producer/Dockerfile
+    env_file:
+      - .env
+    volumes:
+      - ./twitter_raw_data:/app/twitter_raw_data
+    depends_on:
+      kafka:
+        condition: service_healthy
+    # restart: unless-stopped
+
+  stream:
+    build:
+      context: .
+      dockerfile: stream/Dockerfile
+    env_file:
+      - .env
+    depends_on:
+      kafka:
+        condition: service_healthy
+    # restart: unless-stopped
+    command: faust -A stream worker -l info
+
+volumes:
+  kraft-data:
+  influxdb-storage:
+  grafana-storage:
