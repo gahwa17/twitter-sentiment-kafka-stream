@@ -1,7 +1,0 @@
-services:
-  kafka:
-    image: apache/kafka:4.0.0
-    hostname: kafka
-    container_name: kafka-worldcount-demo
-    ports:
-      - "9092:9092"
