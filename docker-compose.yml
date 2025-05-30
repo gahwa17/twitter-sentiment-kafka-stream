@@ -1,40 +1,93 @@
+# version: '3.8'
+
 services:
-  kafka:
+  kafka1:
     image: confluentinc/cp-kafka:7.9.1
+    hostname: kafka1
     ports:
       - "9092:9092"
+    networks:
+      - kafka-net
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093,2@kafka2:9093,3@kafka3:9093
+      KAFKA_LISTENERS: PLAINTEXT://kafka1:9092,CONTROLLER://kafka1:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:9092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LOG_DIRS: /var/lib/kafka/data
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      CLUSTER_ID: my-cluster-id
     entrypoint:
       - sh
       - -c
       - |
-        if [ ! -f "/var/lib/kafka/data/meta.properties" ]; then
-          CLUSTER_ID=$$(/usr/bin/kafka-storage random-uuid)
-          /usr/bin/kafka-storage format --ignore-formatted --cluster-id $$CLUSTER_ID --config /etc/kafka/kafka.properties
-        fi
         exec /etc/confluent/docker/run
+      #   if [ ! -f "/var/lib/kafka/data/meta.properties" ]; then
+      #     CLUSTER_ID=$$(/usr/bin/kafka-storage random-uuid)
+      #     /usr/bin/kafka-storage format --ignore-formatted --cluster-id $$CLUSTER_ID --config /etc/kafka/kafka.properties
+      #   fi
+
     volumes:
-      - kraft-data:/var/lib/kafka/data
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "/usr/bin/kafka-broker-api-versions",
-          "--bootstrap-server",
-          "kafka:9092",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - kraft-data1:/var/lib/kafka/data
+
+  kafka2:
+    image: confluentinc/cp-kafka:7.9.1
+    hostname: kafka2
+    ports:
+      - "9094:9092"
+    networks:
+      - kafka-net
+    environment:
+      KAFKA_NODE_ID: 2
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093,2@kafka2:9093,3@kafka3:9093
+      KAFKA_LISTENERS: PLAINTEXT://kafka2:9092,CONTROLLER://kafka2:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: my-cluster-id
+    entrypoint:
+      - sh
+      - -c
+      - |
+        exec /etc/confluent/docker/run
+      #   if [ ! -f "/var/lib/kafka/data/meta.properties" ]; then
+      #     CLUSTER_ID=$$(/usr/bin/kafka-storage random-uuid)
+      #     /usr/bin/kafka-storage format --ignore-formatted --cluster-id $$CLUSTER_ID --config /etc/kafka/kafka.properties
+      #   fi
+    volumes:
+      - kraft-data2:/var/lib/kafka/data
+
+  kafka3:
+    image: confluentinc/cp-kafka:7.9.1
+    hostname: kafka3
+    ports:
+      - "9096:9092"
+    networks:
+      - kafka-net
+
+    environment:
+      KAFKA_NODE_ID: 3
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093,2@kafka2:9093,3@kafka3:9093
+      KAFKA_LISTENERS: PLAINTEXT://kafka3:9092,CONTROLLER://kafka3:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka3:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: my-cluster-id
+    entrypoint:
+      - sh
+      - -c
+      - |
+        exec /etc/confluent/docker/run
+      #   if [ ! -f "/var/lib/kafka/data/meta.properties" ]; then
+      #     CLUSTER_ID=$$(/usr/bin/kafka-storage random-uuid)
+      #     /usr/bin/kafka-storage format --ignore-formatted --cluster-id $$CLUSTER_ID --config /etc/kafka/kafka.properties
+      #   fi
+    volumes:
+      - kraft-data3:/var/lib/kafka/data
 
   influxdb:
     image: influxdb:2.7
@@ -60,6 +113,8 @@ services:
       - influxdb
 
   producer:
+    networks:
+      - kafka-net
     build:
       context: .
       dockerfile: producer/Dockerfile
@@ -68,23 +123,29 @@ services:
     volumes:
       - ./twitter_raw_data:/app/twitter_raw_data
     depends_on:
-      kafka:
-        condition: service_healthy
-    # restart: unless-stopped
+      kafka1:
+        condition: service_started
 
   stream:
+    networks:
+      - kafka-net
     build:
       context: .
       dockerfile: stream/Dockerfile
     env_file:
       - .env
     depends_on:
-      kafka:
-        condition: service_healthy
-    # restart: unless-stopped
+      kafka1:
+        condition: service_started
     command: faust -A stream worker -l info
 
 volumes:
-  kraft-data:
+  kraft-data1:
+  kraft-data2:
+  kraft-data3:
   influxdb-storage:
   grafana-storage:
+
+networks:
+  kafka-net:
+    driver: bridge

@@ -11,7 +11,11 @@ load_dotenv()
 #     raise ValueError("BEARER_TOKEN not found in environment variables!")
 
 producer = KafkaProducer(
-    bootstrap_servers='kafka:9092',
+    bootstrap_servers=[
+        'kafka1:9092',
+        'kafka2:9092',
+        'kafka3:9092'
+        ],
     value_serializer=lambda x: json.dumps(x).encode('utf-8')
 )
 
@@ -30,15 +34,15 @@ with open(json_path, "r", encoding="utf-8") as f:
 # 建立當天 00:00 的 UTC 時間基準
 base_time = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
-# 傳送資料到 Kafka topic，每筆間隔 1 分鐘
+# 傳送資料到 Kafka topic
 for i, msg in enumerate(tweets):
-    # 覆蓋 timestamp
+    
     fake_time = base_time + timedelta(minutes=i)
     msg["timestamp"] = fake_time.isoformat()
 
     try:
         producer.send("tweets_raw", msg)
-        time.sleep(1)  # 模擬間隔，可調整
+        time.sleep(1)
         print(f"Sent tweet [{i+1}]: {msg['timestamp']} | {msg['text'][:50]}...")
     except Exception as e:
         print("Kafka send error:", e)

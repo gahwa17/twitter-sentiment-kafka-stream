@@ -18,11 +18,14 @@ load_dotenv()
 
 # Faust App 設定
 app = faust.App(
-    'tweet-sentiment', 
-    broker='kafka://kafka:9092',
+    'tweet-sentiment',
+    broker=[
+        'kafka://kafka1:9092',
+        'kafka://kafka2:9092',
+        'kafka://kafka3:9092'
+    ],
     consumer_auto_offset_reset='earliest'
-    )
-
+)
 topic = app.topic('tweets_raw')  # 不指定 Tweet 型別
 
 # 模型與 tokenizer 載入
