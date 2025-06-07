@@ -6,27 +6,28 @@
 2. 情緒分析：分析 Twitter(X) 貼文的情緒並可視化
 
 ## 系統架構圖
-   ![系統架構圖](系統架構圖.jpg)
+
+![系統架構圖](系統架構圖.jpg)
 
 ## 專案架構
 
 ### 1. 文字雲流程
 
-   ```twitter_producer.py → Kafka → WordCount Demo → wordcloud_generator.py → 文字雲圖片```
-   
-   ![文字雲說明](文字雲說明.jpg)
+`twitter_producer.py → Kafka → WordCount Demo → wordcloud_generator.py → 文字雲圖片`
+
+![文字雲說明](文字雲說明.jpg)
 
 ### 2. 情緒分析流程
 
-   ```producer.py → Kafka topic (tweets_raw)  stream.py (Faust + twitter-roberta-base-sentiment model) → InfluxDB → Grafana```
+`producer.py → Kafka topic (tweets_raw)  stream.py (Faust + twitter-roberta-base-sentiment model) → InfluxDB → Grafana`
 
-   ![情緒分析說明](情緒分析說明.jpg)
+![情緒分析說明](情緒分析說明.jpg)
 
-   - **Kafka**：建置三個 broker，實現高可用與高吞吐
-   - **Faust**：Python stream processing library，作為 Kafka consumer 與處理邏輯
-   - **Transformers**：使用 `cardiffnlp/twitter-roberta-base-sentiment` 進行情緒分析
-   - **InfluxDB**：存放分析結果
-   - **Grafana**：展示情緒分析資料
+- **Kafka**：建置三個 broker，實現高可用與高吞吐
+- **Faust**：Python stream processing library，作為 Kafka consumer 與處理邏輯
+- **Transformers**：使用 `cardiffnlp/twitter-roberta-base-sentiment` 進行情緒分析
+- **InfluxDB**：存放分析結果
+- **Grafana**：展示情緒分析資料
 
 ## 啟動流程
 
@@ -61,6 +62,18 @@
 1. 請先確認 Kafka 三個 brokers 都已啟動，否則 init-topics.sh 無法成功執行
 2. 可調整 BATCH_SIZE 與 FLUSH_TIMEOUT 控制分析頻率與即時程度
 
+## 非功能性應用 HeartBeat
+
+1. 藉由發送 HeartBeat 並在失敗時自動以 SMTP 發送 Email 的監控機制得知服務是否故障
+2. 設定 .env
+
+- SMTP_USER = 填寫寄件者 email
+- SMTP_PASSWORD = 填寫 Gmail 應用程式密碼（需要申請）
+- ALERT_TO = 填寫收件者 email
+
+4. 執行 heartbeat.py
+
 ## DEMO 與簡報連結
+
 - [Sentiment Analysis](https://youtu.be/QUcHO3FLdDE)
 - [Heart Beat](https://youtu.be/P57AWd9K4x0)
